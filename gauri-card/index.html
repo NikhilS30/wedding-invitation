@@ -575,7 +575,7 @@ address{font-style:normal;font-size:21px}
     </article>
     <article class="leaf t-baraat">
       <svg class="spray tl" viewBox="0 0 120 60" data-spray="12"></svg><svg class="spray" viewBox="0 0 120 60" data-spray="13"></svg>
-      <div class="pic"><img src="img/baraat.jpg" alt="Gauri and Nikhil holding hands"><span class="neon">Baraat &#9825;</span><svg class="deco" viewBox="0 0 264 66" data-deco="baraat" aria-hidden="true"></svg></div>
+      <div class="pic"><img src="img/baraat.jpg" alt="Gauri and Nikhil in wedding clothes with varmala, hands folded"></div>
       <h3>Baraat</h3>
       <div class="rule"></div>
       <p class="when">Tuesday, 2 February 2027</p>
@@ -929,28 +929,41 @@ document.querySelectorAll("[data-deco]").forEach(svg => {
 })();
 
 /* ---------- Bell and music ---------- */
-let audio = null;
+let audio = null, wantMusic = false, userMuted = false;
 const musicBtn = $("#music");
 function label(on){ musicBtn.setAttribute("aria-pressed", on); musicBtn.setAttribute("aria-label", on ? "Turn the music off" : "Turn the music on"); }
+function fadeUp(){
+  let k = 0;
+  const iv = setInterval(() => {
+    k = Math.min(1, k + .05);
+    try { audio.volume = k * .72; } catch (e) {}
+    if (k >= 1) clearInterval(iv);
+  }, 110);
+  setTimeout(() => { try { if (!audio.paused && audio.volume < .4) audio.volume = .72; } catch (e) {} }, 4500);
+}
 function setMusic(on){
   if (!audio) return;
+  musicBtn.hidden = false;
   if (on){
+    wantMusic = true;
     if (!audio.paused){ label(true); return; }
-    audio.volume = 0;
-    audio.play().then(() => {
-      musicBtn.hidden = false; label(true);
-      const t0 = performance.now();
-      (function up(t){
-        const k = Math.min(1, (t - t0) / 2200);
-        audio.volume = k * 0.72;
-        if (k < 1) requestAnimationFrame(up);
-      })(t0);
-    }).catch(() => label(false));
+    try { audio.volume = 0; } catch (e) {}
+    let p;
+    try { p = audio.play(); } catch (e) { label(false); return; }
+    label(true);
+    if (p && p.then) p.then(fadeUp).catch(() => { try { audio.volume = .72; } catch (e) {} label(false); });
+    else fadeUp();
   } else { audio.pause(); label(false); }
 }
 if (MUSIC){
-  audio = new Audio(MUSIC); audio.loop = true; audio.preload = "auto"; audio.volume = 0;
-  musicBtn.addEventListener("click", () => setMusic(audio.paused));
+  audio = new Audio(MUSIC); audio.loop = true; audio.preload = "auto";
+  musicBtn.addEventListener("click", () => {
+    if (audio.paused){ userMuted = false; setMusic(true); }
+    else { userMuted = true; setMusic(false); }
+  });
+  ["touchend", "click", "keydown"].forEach(ev => document.addEventListener(ev, e => {
+    if (wantMusic && !userMuted && audio.paused && !musicBtn.contains(e.target)) setMusic(true);
+  }, { passive: true }));
 }
 let actx = null;
 function ding(){
@@ -1039,7 +1052,7 @@ const bell = $("#bell");
 bell.addEventListener("click", () => {
   bell.classList.remove("ring"); void bell.offsetWidth; bell.classList.add("ring");
   if (!audio || audio.paused) ding();
-  setMusic(true);
+  if (!userMuted) setMusic(true);
   setTimeout(() => $("#story").scrollIntoView({ behavior: reduced ? "auto" : "smooth" }), reduced ? 0 : 900);
 });
 
